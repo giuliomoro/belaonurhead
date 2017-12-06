@@ -78,7 +78,7 @@ AuxiliaryTask gravityNeutralTask;		// Auxiliary task to read gravity from I2C
 AuxiliaryTask gravityDownTask;		// Auxiliary task to read gravity from I2C
 
 int readCount = 0;			// How long until we read again...
-int readIntervalSamples = 0; // How many samples between reads
+int readIntervalBlocks = 0; // How many samples between reads
 
 int printThrottle = 0; // used to limit printing frequency
 
@@ -537,7 +537,7 @@ bool setup(BelaContext *context, void *userData)
 	// set sensor reading in a separate thread
 	// so it doesn't interfere with the audio processing
 	i2cTask = Bela_createAuxiliaryTask(&readIMU, 5, "bela-bno");
-	readIntervalSamples = context->audioSampleRate / readInterval;
+	readIntervalBlocks = context->audioSampleRate / readInterval / context->audioFrames;
 	
 	gravityNeutralTask = Bela_createAuxiliaryTask(&getNeutralGravity, 5, "bela-neu-gravity");
 	gravityDownTask = Bela_createAuxiliaryTask(&getDownGravity, 5, "bela-down-gravity");
@@ -730,43 +730,6 @@ void render(BelaContext *context, void *userData)
 			scope.log(gScopeOut[0], gScopeOut[1], gScopeOut[2], gScopeOut[3]);
 		}
 
-		//************ Added for BNO055 based head-tracking ***************
-
-		// this schedules the imu sensor readings
-		if(++readCount >= readIntervalSamples) {
-			readCount = 0;
-			Bela_scheduleAuxiliaryTask(i2cTask);
-		}
-		
-		// send IMU values to Pd
-		libpd_float("bno-yaw", ypr[0]);
-		libpd_float("bno-pitch", ypr[1]);
-		libpd_float("bno-roll", ypr[2]);
-
-		//read the value of the button
-		int buttonValue = digitalRead(context, 0, buttonPin); 
-
-		// if button wasn't pressed before and is pressed now
-		if( buttonValue != lastButtonValue && buttonValue == 1 ){
-			// then run calibration to set looking forward (gGravIdle) 
-			// and looking down (gGravCal)
-			switch(calibrationState) {
-			case 0: // first time button was pressed
-				setForward = 1;
-				// run task to get gravity values when sensor in neutral position
-				Bela_scheduleAuxiliaryTask(gravityNeutralTask);
-				calibrationState = 1;	// progress calibration state
-				break;
-			case 1: // second time button was pressed
-				// run task to get gravity values when sensor 'looking down' (for head-tracking) 
-		 		Bela_scheduleAuxiliaryTask(gravityDownTask);
-				calibrationState = 0; // reset calibration state for next time
-				break;
-			} 
-		}
-		lastButtonValue = buttonValue;
-		
-		//************ 
 		// audio output
 		for(int n = 0; n < context->audioInChannels; ++n)
 		{
@@ -787,6 +750,46 @@ void render(BelaContext *context, void *userData)
 			);
 		}
 	}
+	//************ Added for BNO054 based head-tracking ***************
+
+	// send IMU values to Pd
+	libpd_float("bno-yaw", ypr[0]);
+	libpd_float("bno-pitch", ypr[1]);
+	libpd_float("bno-roll", ypr[2]);
+
+	//read the value of the button
+	int buttonValue;
+	if(gDigitalEnabled)
+		buttonValue = digitalRead(context, 0, buttonPin);
+	else
+		buttonValue = 0;
+
+	// if button wasn't pressed before and is pressed now
+	if( buttonValue != lastButtonValue && buttonValue == 1 ){
+		// then run calibration to set looking forward (gGravIdle)
+		// and looking down (gGravCal)
+		switch(calibrationState) {
+		case 0: // first time button was pressed
+			setForward = 1;
+			// run task to get gravity values when sensor in neutral position
+			Bela_scheduleAuxiliaryTask(gravityNeutralTask);
+			calibrationState = 1;	// progress calibration state
+			break;
+		case 1: // second time button was pressed
+			// run task to get gravity values when sensor 'looking down' (for head-tracking)
+	 		Bela_scheduleAuxiliaryTask(gravityDownTask);
+			calibrationState = 0; // reset calibration state for next time
+			break;
+		}
+	}
+	// this schedules the imu sensor readings
+	if(++readCount >= readIntervalBlocks) {
+		readCount = 0;
+		Bela_scheduleAuxiliaryTask(i2cTask);
+	}
+	lastButtonValue = buttonValue;
+
+	//************
 }
 
 void cleanup(BelaContext *context, void *userData)
