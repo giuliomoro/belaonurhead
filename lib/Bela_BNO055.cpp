@@ -234,37 +234,9 @@ void I2C_BNO055::getCalibration(uint8_t* sys, uint8_t* gyro, uint8_t* accel, uin
 **************************************************************************/
 uint8_t I2C_BNO055::readRegister(uint8_t reg) 
 {
-    i2c_char_t inbuf, outbuf;
-    struct i2c_rdwr_ioctl_data packets;
-    struct i2c_msg messages[2];
-
-    /*
-     * In order to read a register, we first do a "dummy write" by writing
-     * 0 bytes to the register we want to read from.  This is similar to
-     * the packet in set_i2c_register, except it's 1 byte rather than 2.
-     */
-    outbuf = reg;
-    messages[0].addr  = _i2c_address;
-    messages[0].flags = 0;
-    messages[0].len   = sizeof(outbuf);
-    messages[0].buf   = &outbuf;
-
-    /* The data will get returned in this structure */
-    messages[1].addr  = _i2c_address;
-    messages[1].flags = I2C_M_RD/* | I2C_M_NOSTART*/;
-    messages[1].len   = sizeof(inbuf);
-    messages[1].buf   = &inbuf;
-
-    /* Send the request to the kernel and get the result back */
-    packets.msgs      = messages;
-    packets.nmsgs     = 2;
-    int t = ioctl(i2C_file, I2C_RDWR, &packets);
-    if( t < 0) {
-        fprintf(stderr, "Unable to send data from readRegister: %d\n", t);
-        return 0;
-    }
-
-    return inbuf;
+	i2c_char_t in;
+	readRegisters(reg, &in, sizeof(i2c_char_t));
+	return in;
 }
 
 
@@ -274,13 +246,7 @@ uint8_t I2C_BNO055::readRegister(uint8_t reg)
 **************************************************************************/
 void I2C_BNO055::writeRegister(uint8_t reg, uint8_t value) 
 {
-	uint8_t buf[2] = { reg, value };
-
-	if(write(i2C_file, buf, 2) != 2)
-	{
-		fprintf(stderr, "Failed to write register %d on BNO055\n", (int)reg);
-		return;
-	}
+	writeRegisters(reg, &value, sizeof(value));
 }
 
 /**************************************************************************
@@ -289,19 +255,21 @@ void I2C_BNO055::writeRegister(uint8_t reg, uint8_t value)
 **************************************************************************/
 imu::Quaternion I2C_BNO055::getQuat(void)
 {
-  int16_t x, y, z, w;
-  x = y = z = w = 0;
+	int16_t x, y, z, w;
 
-  // read quat data
-  uint8_t w_lsb = readRegister(BNO055_QUATERNION_DATA_W_LSB_ADDR);
-  uint8_t w_msb = readRegister(BNO055_QUATERNION_DATA_W_MSB_ADDR);
-  uint8_t x_lsb = readRegister(BNO055_QUATERNION_DATA_X_LSB_ADDR);
-  uint8_t x_msb = readRegister(BNO055_QUATERNION_DATA_X_MSB_ADDR);
-  uint8_t y_lsb = readRegister(BNO055_QUATERNION_DATA_Y_LSB_ADDR);
-  uint8_t y_msb = readRegister(BNO055_QUATERNION_DATA_Y_MSB_ADDR);
-  uint8_t z_lsb = readRegister(BNO055_QUATERNION_DATA_Z_LSB_ADDR);
-  uint8_t z_msb = readRegister(BNO055_QUATERNION_DATA_Z_MSB_ADDR);
-  
+	// read quat data with a single read.
+	// This relies on the fact that BNO055_QUATERNION_DATA_W_LSB_ADDR
+	// to BNO055_QUATERNION_DATA_Z_MSB_ADDR are located in contiguous registers
+	i2c_char_t inbuf[BNO055_QUATERNION_DATA_Z_MSB_ADDR - BNO055_QUATERNION_DATA_W_LSB_ADDR + 1];
+	readRegisters(BNO055_QUATERNION_DATA_W_LSB_ADDR, inbuf, sizeof(inbuf));
+	uint8_t w_lsb = inbuf[0];
+	uint8_t w_msb = inbuf[1];
+	uint8_t x_lsb = inbuf[2];
+	uint8_t x_msb = inbuf[3];
+	uint8_t y_lsb = inbuf[4];
+	uint8_t y_msb = inbuf[5];
+	uint8_t z_lsb = inbuf[6];
+	uint8_t z_msb = inbuf[7];
   
   w = (((uint16_t)w_msb) << 8) | ((uint16_t)w_lsb);
   x = (((uint16_t)x_msb) << 8) | ((uint16_t)x_lsb);
