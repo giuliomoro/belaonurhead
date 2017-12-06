@@ -64,7 +64,7 @@ boolean I2C_BNO055::begin(uint8_t bus, uint8_t i2caddr)
 	
 	// check the chip ID  
   	uint8_t id = readRegister(BNO055_CHIP_ID_ADDR);
-  	rt_printf("id: %d\n", id);
+	printf("id: %d\n", id);
   	if(id != BNO055_ID)
   	{
 		usleep(1000); // hold on for boot
@@ -76,7 +76,7 @@ boolean I2C_BNO055::begin(uint8_t bus, uint8_t i2caddr)
 
   	// switch to config mode (just in case since this is the default) */
   	setMode(OPERATION_MODE_CONFIG);
-  	rt_printf("switching to operation mode\n");
+	printf("switching to operation mode\n");
 
   	// reset 
   	writeRegister(BNO055_SYS_TRIGGER_ADDR, 0x20);
@@ -85,7 +85,7 @@ boolean I2C_BNO055::begin(uint8_t bus, uint8_t i2caddr)
   	{
     	usleep(300000);
   	}
-  	rt_printf("in operation mode\n");
+	printf("in operation mode\n");
 
   	// set to normal power mode
   	writeRegister(BNO055_PWR_MODE_ADDR, POWER_MODE_NORMAL);
@@ -260,7 +260,7 @@ uint8_t I2C_BNO055::readRegister(uint8_t reg)
     packets.nmsgs     = 2;
     int t = ioctl(i2C_file, I2C_RDWR, &packets);
     if( t < 0) {
-        rt_printf("Unable to send data from readRegister: %d\n", t);
+        fprintf(stderr, "Unable to send data from readRegister: %d\n", t);
         return 0;
     }
 
@@ -278,7 +278,7 @@ void I2C_BNO055::writeRegister(uint8_t reg, uint8_t value)
 
 	if(write(i2C_file, buf, 2) != 2)
 	{
-		cout << "Failed to write register " << (int)reg << " on BNO055\n";
+		fprintf(stderr, "Failed to write register %d on BNO055\n", (int)reg);
 		return;
 	}
 }

@@ -519,11 +519,11 @@ bool setup(BelaContext *context, void *userData)
 
 	//************ Added for BNO055 based head-tracking *****************
 	if(!bno.begin()) {
-		rt_printf("Error initialising BNO055\n");
+		fprintf(stderr, "Error initialising BNO055\n");
 		return false;
 	}
 	
-	rt_printf("Initialised BNO055\n");
+	printf("Initialised BNO055\n");
 	
 	// use external crystal for better accuracy
   	bno.setExtCrystalUse(true);
@@ -531,7 +531,7 @@ bool setup(BelaContext *context, void *userData)
 	// get the system status of the sensor to make sure everything is ok
 	uint8_t sysStatus, selfTest, sysError;
   	bno.getSystemStatus(&sysStatus, &selfTest, &sysError);
-	rt_printf("System Status: %d (0 is Idle)   Self Test: %d (15 is all good)   System Error: %d (0 is no error)\n", sysStatus, selfTest, sysError);
+	printf("System Status: %d (0 is Idle)   Self Test: %d (15 is all good)   System Error: %d (0 is no error)\n", sysStatus, selfTest, sysError);
 
 	
 	// set sensor reading in a separate thread
@@ -808,8 +808,8 @@ void readIMU(void*)
 	uint8_t sys, gyro, accel, mag;
 	bno.getCalibration(&sys, &gyro, &accel, &mag);
 	// status of 3 means fully calibrated
-	//rt_printf("CALIBRATION STATUSES\n");
-	//rt_printf("System: %d   Gyro: %d Accel: %d  Mag: %d\n", sys, gyro, accel, mag);
+	//printf("CALIBRATION STATUSES\n");
+	//printf("System: %d   Gyro: %d Accel: %d  Mag: %d\n", sys, gyro, accel, mag);
 	
 	// quaternion data routine from MrHeadTracker
   	imu::Quaternion qRaw = bno.getQuat(); //get sensor raw quaternion data
